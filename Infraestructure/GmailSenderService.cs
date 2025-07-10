@@ -118,7 +118,7 @@ namespace Infrastructure.Services
                             <p style=""font-size: 16px; margin-bottom: 20px; color: #333333;"">Hola:</p>
                             <p style=""font-size: 15px; margin-bottom: 15px; color: #424242;"">{{body}}</p>
                             <p style=""font-size: 15px; margin-bottom: 20px; color: #424242;"">Un afectuoso saludo,</p>
-                            <p style=""font-size: 15px; color: #424242;"">[Tu Nombre]</p>
+                            <p style=""font-size: 15px; color: #424242;"">[wall]</p>
                         </td>
                     </tr>
 
