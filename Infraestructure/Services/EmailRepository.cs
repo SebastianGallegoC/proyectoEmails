@@ -8,20 +8,19 @@ namespace Domain.Interfaces
     {
         private readonly string _connectionString;
 
-       
         public EmailRepository(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        public async Task SaveEmailAsync(string to,string subject, string body)
+        public async Task SaveEmailAsync(string to, string subject, string body)
         {
             using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
 
             var command = new NpgsqlCommand(
-               "INSERT INTO \"GuardadoInformacion\" (\"Destinatario\", \"Asunto\", \"Contenido\") VALUES (@to, @subject, @body)",
-    connection);
+                "INSERT INTO \"GuardadoInformacion\" (\"Destinatario\", \"Asunto\", \"Contenido\") VALUES (@to, @subject, @body)",
+                connection);
 
             command.Parameters.AddWithValue("to", to);
             command.Parameters.AddWithValue("subject", subject);

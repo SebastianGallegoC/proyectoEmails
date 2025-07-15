@@ -19,15 +19,18 @@ namespace EmailsP.Controllers
         }
 
         [HttpPost("Send")]
-        [Authorize] // 🔐 Este endpoint ahora requiere un token JWT válido
-        public async Task<IActionResult> SendEmail([FromBody] EmailRequest request)
+        [Authorize] // 🔐 Este endpoint requiere token JWT válido
+        public IActionResult SendEmail([FromBody] EmailRequest request)
         {
-            await _useCase.ExecuteAsync(request.To, request.Subject, request.Body);
-            return Ok("Correo enviado correctamente.");
+            // Ejecutar el envío en segundo plano para no bloquear al cliente
+            _ = Task.Run(() => _useCase.ExecuteAsync(request.To, request.Subject, request.Body));
+
+            // Respuesta inmediata
+            return Ok("✅ Envío de correo iniciado. Puedes continuar.");
         }
 
         [HttpPost("Login")]
-        [AllowAnonymous] // Este sigue siendo público, para obtener el token
+        [AllowAnonymous] // Público para obtener el token
         public IActionResult Login([FromBody] LoginRequest request)
         {
             var response = _authService.Authenticate(request);
