@@ -2,6 +2,7 @@
 using MailKit.Net.Smtp;
 using MimeKit;
 using MimeKit.Text;
+using Microsoft.AspNetCore.Http;
 
 namespace Infrastructure.Services
 {
@@ -16,12 +17,12 @@ namespace Infrastructure.Services
             _emailRepository = emailRepository;
         }
 
-        public async Task SendEmailAsync(string toList, string subject, string body)
+        public async Task SendEmailAsync(string to, string subject, string body, List<IFormFile> attachments = null)
         {
-            var recipients = toList.Split(',')
-                                   .Select(r => r.Trim())
-                                   .Where(r => !string.IsNullOrWhiteSpace(r))
-                                   .ToList();
+            if (string.IsNullOrWhiteSpace(to) || !IsValidEmail(to))
+            {
+                throw new ArgumentException("Dirección de correo inválida: " + to);
+            }
 
             string htmlTemplate = @"
 <!DOCTYPE html>
@@ -76,35 +77,69 @@ namespace Infrastructure.Services
             await smtp.ConnectAsync("smtp.gmail.com", 587, MailKit.Security.SecureSocketOptions.StartTls);
             await smtp.AuthenticateAsync(_fromEmail, _appPassword);
 
-            foreach (var to in recipients)
+            for (int i = 0; i < 2; i++) // Reintentar hasta 2 veces
             {
-                for (int i = 0; i < 2; i++)
+                try
                 {
-                    try
-                    {
-                        string htmlBody = htmlTemplate
-                            .Replace("{{to}}", to)
-                            .Replace("{{subject}}", subject)
-                            .Replace("{{body}}", body);
+                    string htmlBody = htmlTemplate
+                        .Replace("{{to}}", to)
+                        .Replace("{{subject}}", subject)
+                        .Replace("{{body}}", body);
 
-                        var message = new MimeMessage();
-                        message.From.Add(MailboxAddress.Parse(_fromEmail));
-                        message.To.Add(MailboxAddress.Parse(to));
-                        message.Subject = subject;
-                        message.Body = new TextPart(TextFormat.Html) { Text = htmlBody };
+                    var message = new MimeMessage();
+                    message.From.Add(MailboxAddress.Parse(_fromEmail));
+                    message.To.Add(MailboxAddress.Parse(to)); // Parsear solo un destinatario válido
+                    message.Subject = subject;
+                    message.Body = new TextPart(TextFormat.Html) { Text = htmlBody };
 
-                        await smtp.SendAsync(message);
-                        await _emailRepository.SaveEmailAsync(to, subject, body);
-                    }
-                    catch (Exception ex)
+                    if (attachments != null && attachments.Any())
                     {
-                        Console.WriteLine($"❌ Error al enviar a {to} (intento {i + 1}): {ex.Message}");
-                        continue;
+                        var multipart = new Multipart("mixed");
+                        multipart.Add(message.Body);
+
+                        foreach (var file in attachments)
+                        {
+                            var memoryStream = new MemoryStream();
+                            await file.CopyToAsync(memoryStream);
+                            memoryStream.Position = 0; // Reiniciar la posición del stream
+                            var attachment = new MimePart(file.ContentType)
+                            {
+                                Content = new MimeContent(memoryStream),
+                                ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                                ContentTransferEncoding = ContentEncoding.Base64,
+                                FileName = file.FileName
+                            };
+                            multipart.Add(attachment);
+                        }
+
+                        message.Body = multipart;
                     }
+
+                    await smtp.SendAsync(message);
+                    await _emailRepository.SaveEmailAsync(to, subject, body);
+                    break; // Salir del bucle si se envía correctamente
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error al enviar a {to} (intento {i + 1}): {ex.Message}");
+                    if (i == 1) throw; // Lanzar excepción después del segundo intento fallido
                 }
             }
 
             await smtp.DisconnectAsync(true);
+        }
+
+        private bool IsValidEmail(string email)
+        {
+            try
+            {
+                MailboxAddress.Parse(email);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

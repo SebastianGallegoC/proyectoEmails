@@ -2,6 +2,7 @@
 using Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 
 namespace EmailsP.Controllers
 {
@@ -20,13 +21,17 @@ namespace EmailsP.Controllers
 
         [HttpPost("Send")]
         [Authorize] // 🔐 Este endpoint requiere token JWT válido
-        public IActionResult SendEmail([FromBody] EmailRequest request)
+        public async Task<IActionResult> SendEmail([FromForm] EmailRequest request)
         {
-            // Ejecutar el envío en segundo plano para no bloquear al cliente
-            _ = Task.Run(() => _useCase.ExecuteAsync(request.To, request.Subject, request.Body));
+            if (request.To == null || !request.To.Any())
+            {
+                return BadRequest("Debe proporcionar al menos un destinatario.");
+            }
 
-            // Respuesta inmediata
-            return Ok("✅ Envío de correo iniciado. Puedes continuar.");
+            // Ejecutar el envío y esperar la finalización
+            await _useCase.ExecuteAsync(request.To, request.Subject, request.Body, request.Attachments);
+
+            return Ok("✅ Envío de correos completado.");
         }
 
         [HttpPost("Login")]

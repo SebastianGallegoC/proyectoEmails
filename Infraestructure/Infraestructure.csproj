@@ -17,11 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Application\Application.csproj" />
-    <ProjectReference Include="..\Domain\Domain.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
     <PackageReference Include="Google.Apis.Gmail.v1" Version="1.69.0.3742" />
@@ -30,6 +25,10 @@
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.5" />
     <PackageReference Include="Microsoft.IdentityModel.ManagedKeyVaultSecurityKey" Version="7.7.1" />
     <PackageReference Include="Npgsql" Version="9.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Domain\Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
