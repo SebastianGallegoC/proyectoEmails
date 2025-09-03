@@ -9,7 +9,7 @@ EmailsP es una API diseñada para el envío masivo de correos electrónicos con 
 
 ## Instalación
 1) Clona el repositorio:
-git clone https://github.com/[tu-usuario]/EmailsP.git
+git clone https://github.com/SebastianGallegoC/proyectoEmails.git
 
 2) Navega al directorio del proyecto:
 
