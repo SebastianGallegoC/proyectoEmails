@@ -29,5 +29,9 @@ Se recomienda instalar y tener actualizado las dependencias
 
 
 <img width="886" height="949" alt="image" src="https://github.com/user-attachments/assets/213f72ad-a765-4def-9aea-d77413de08f5" />
+<img width="595" height="903" alt="image" src="https://github.com/user-attachments/assets/5c9f5260-0721-4104-a94f-77d84300fb6f" />
+<img width="581" height="905" alt="image" src="https://github.com/user-attachments/assets/fec46940-a1ba-4ec8-8618-04778e18c40b" />
+<img width="590" height="943" alt="image" src="https://github.com/user-attachments/assets/026eb5a1-6cf2-4851-a911-48d5ee8bfd80" />
+
 
 
