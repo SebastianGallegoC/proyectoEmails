@@ -22,6 +22,7 @@ Se recomienda instalar y tener actualizado las dependencias
 - "Desarrollo de Escritorio de .NET".
 
 ## Colaboradores
+- Documentacion: https://drive.google.com/file/d/1ZjEIuAPGxwr-ZmU5dsRUiNA5G3cAo-jR/view?usp=sharing
 - [@waldooCreator](https://github.com/waldooCreator) - Walter Esteban Velasco Contreras
 - [@vvpskvd](https://github.com/vvpskvd) - Daniel Alejandro Arevalo Guecha
 - [@SebastianGallegoC](https://github.com/SebastianGallegoC) - Juan Sebastian Gallego Carrillo
