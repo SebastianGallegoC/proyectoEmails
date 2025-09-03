@@ -27,3 +27,7 @@ Se recomienda instalar y tener actualizado las dependencias
 - [@vvpskvd](https://github.com/vvpskvd) - Daniel Alejandro Arevalo Guecha
 - [@SebastianGallegoC](https://github.com/SebastianGallegoC) - Juan Sebastian Gallego Carrillo
 
+
+<img width="886" height="949" alt="image" src="https://github.com/user-attachments/assets/213f72ad-a765-4def-9aea-d77413de08f5" />
+
+
