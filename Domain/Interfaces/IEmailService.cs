@@ -1,14 +1,17 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 
 namespace Domain.Interfaces
 {
     public interface IEmailService
     {
-        Task SendEmailAsync(string to, string subject, string body, List<IFormFile> attachments = null);
+        Task SendAsync(
+            IEnumerable<string> to,
+            string subject,
+            string? bodyHtml,
+            IEnumerable<IFormFile>? attachments,
+            CancellationToken ct = default);
     }
 }

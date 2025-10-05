@@ -1,0 +1,328 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>EmailsP – Enviar correo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;
+            margin: 24px;
+            color: #111
+        }
+
+        h1 {
+            margin: 0 0 16px
+        }
+
+        .row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap
+        }
+
+        .col {
+            flex: 1 1 360px;
+            min-width: 320px
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin: 12px 0 6px
+        }
+
+        input[type="text"], input[type="email"], textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px
+        }
+
+        textarea {
+            min-height: 120px
+        }
+
+        .chips {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 6px
+        }
+
+        .chip {
+            background: #eef;
+            border: 1px solid #cde;
+            border-radius: 999px;
+            padding: 6px 10px;
+            display: inline-flex;
+            gap: 8px;
+            align-items: center
+        }
+
+            .chip button {
+                border: none;
+                background: transparent;
+                cursor: pointer
+            }
+
+        button, .btn {
+            background: #0d6efd;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer
+        }
+
+        .btn-secondary {
+            background: #6c757d
+        }
+
+        .btn-danger {
+            background: #dc3545
+        }
+
+        .muted {
+            color: #666;
+            font-size: .9rem
+        }
+
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin: 8px 0
+        }
+
+        .ok {
+            color: #0a7d00
+        }
+
+        .err {
+            color: #b00020;
+            white-space: pre-wrap
+        }
+
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 16px
+        }
+
+        .right {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px
+        }
+    </style>
+</head>
+<body>
+    <h1>📧 EmailsP — Enviar correo</h1>
+
+    <div class="row">
+        <div class="col card">
+            <h3>1) Autenticación</h3>
+            <label>JWT (pégalo desde Swagger → Auth/login):</label>
+            <input id="jwt" type="text" placeholder="eyJhbGciOiJI..." />
+            <div class="toolbar">
+                <button id="saveToken" class="btn">Guardar token</button>
+                <button id="clearToken" class="btn btn-secondary">Borrar</button>
+                <span id="authMsg" class="muted"></span>
+            </div>
+            <p class="muted">El token se guarda en <code>localStorage</code> para reutilizarlo.</p>
+        </div>
+
+        <div class="col card">
+            <h3>2) Seleccionar contactos</h3>
+            <label>Buscar:</label>
+            <input id="search" type="text" placeholder="Nombre, email o teléfono">
+            <div class="toolbar">
+                <button id="loadContacts" class="btn">Cargar contactos</button>
+                <span id="loadMsg" class="muted"></span>
+            </div>
+            <label>Lista de contactos:</label>
+            <select id="contacts" multiple size="10"></select>
+            <div class="toolbar">
+                <button id="addSelected" class="btn">➕ Agregar a To</button>
+                <button id="removeSelected" class="btn btn-secondary">Quitar seleccionados</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row card">
+        <div class="col">
+            <h3>3) Redacción</h3>
+            <label>Para (To):</label>
+            <div id="toChips" class="chips"></div>
+            <label>Asunto:</label>
+            <input id="subject" type="text" placeholder="Asunto del correo">
+            <label>Cuerpo (HTML permitido):</label>
+            <textarea id="body" placeholder="Contenido..."></textarea>
+        </div>
+        <div class="col">
+            <h3>Adjuntos</h3>
+            <input id="files" type="file" multiple>
+            <p class="muted">Puedes adjuntar varios archivos (límite de 100 MB totales en esta API).</p>
+            <div class="right">
+                <button id="send" class="btn">📨 Enviar</button>
+                <button id="clearAll" class="btn btn-danger">Limpiar</button>
+            </div>
+            <div id="result" class="stack" style="margin-top:12px;"></div>
+        </div>
+    </div>
+
+    <script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const jwtInput = $("jwt");
+  const authMsg = $("authMsg");
+  const contactsSel = $("contacts");
+  const loadMsg = $("loadMsg");
+  const toChips = $("toChips");
+  const subject = $("subject");
+  const body = $("body");
+  const files = $("files");
+  const search = $("search");
+  const result = $("result");
+
+  let TO = []; // emails seleccionados
+
+  // Load/save token
+  function readToken(){
+    const t = localStorage.getItem("emailsP_jwt") || "";
+    jwtInput.value = t;
+    if(t) authMsg.textContent = "Token cargado.";
+  }
+  readToken();
+
+  $("saveToken").onclick = () => {
+    localStorage.setItem("emailsP_jwt", jwtInput.value.trim());
+    authMsg.textContent = "Token guardado.";
+  };
+  $("clearToken").onclick = () => {
+    localStorage.removeItem("emailsP_jwt");
+    jwtInput.value = "";
+    authMsg.textContent = "Token borrado.";
+  };
+
+  // Render chips To
+  function renderChips(){
+    toChips.innerHTML = "";
+    TO.forEach((email, idx) => {
+      const div = document.createElement("div");
+      div.className = "chip";
+      div.innerHTML = `<span>${email}</span>`;
+      const btn = document.createElement("button");
+      btn.textContent = "✕";
+      btn.onclick = () => { TO.splice(idx,1); renderChips(); };
+      div.appendChild(btn);
+      toChips.appendChild(div);
+    });
+  }
+
+  // Cargar contactos
+  async function loadContacts(){
+    loadMsg.textContent = "Cargando...";
+    contactsSel.innerHTML = "";
+    try{
+      const token = jwtInput.value.trim();
+      if(!token){ loadMsg.textContent = "Pega el JWT primero."; return; }
+
+      // Búsqueda opcional
+      const q = encodeURIComponent(search.value || "");
+      const url = `/api/Contacts?q=${q}&page=1&pageSize=500`;
+
+      const res = await fetch(url, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if(!res.ok){
+        loadMsg.textContent = `Error ${res.status}`;
+        return;
+      }
+      const data = await res.json(); // { items, total, page, pageSize }
+      (data.items || []).forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.email;
+        opt.textContent = `${c.name} <${c.email}>${c.isBlocked ? " 🚫" : ""}${c.isFavorite ? " ★" : ""}`;
+        opt.dataset.isBlocked = c.isBlocked ? "1" : "0";
+        contactsSel.appendChild(opt);
+      });
+      loadMsg.textContent = `Mostrando ${data.items?.length || 0} / ${data.total || 0}`;
+    }catch(e){
+      console.error(e);
+      loadMsg.textContent = "Error de red";
+    }
+  }
+  $("loadContacts").onclick = loadContacts;
+  search.onkeydown = (e)=>{ if(e.key==="Enter"){ loadContacts(); } };
+
+  // Agregar/Quitar seleccionados
+  $("addSelected").onclick = () => {
+    const blocked = [];
+    [...contactsSel.selectedOptions].forEach(opt => {
+      if(opt.dataset.isBlocked === "1"){ blocked.push(opt.textContent); return; }
+      const email = opt.value;
+      if(email && !TO.includes(email)) TO.push(email);
+    });
+    renderChips();
+    if(blocked.length){
+      alert("Se omitieron bloqueados:\n" + blocked.join("\n"));
+    }
+  };
+  $("removeSelected").onclick = () => {
+    const sel = new Set([...contactsSel.selectedOptions].map(o=>o.value));
+    TO = TO.filter(x => !sel.has(x));
+    renderChips();
+  };
+
+  // Limpiar todo
+  $("clearAll").onclick = () => {
+    TO = []; renderChips();
+    subject.value = ""; body.value = ""; files.value = "";
+    result.innerHTML = "";
+  };
+
+  // Enviar
+  $("send").onclick = async () => {
+    result.textContent = "";
+    const token = jwtInput.value.trim();
+    if(!token){ result.innerHTML = `<div class="err">Pega el JWT primero.</div>`; return; }
+    if(TO.length === 0){ result.innerHTML = `<div class="err">Agrega al menos un destinatario.</div>`; return; }
+
+    const fd = new FormData();
+    TO.forEach(t => fd.append("To", t));
+    fd.append("Subject", subject.value || "");
+    fd.append("Body", body.value || "");
+
+    for(const f of files.files){ fd.append("Attachments", f, f.name); }
+
+    try{
+      const res = await fetch("/Email/Send", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+        body: fd
+      });
+      const text = await res.text();
+      if(res.ok){
+        result.innerHTML = `<div class="ok">✔ ${text}</div>`;
+      }else{
+        result.innerHTML = `<div class="err">✖ ${res.status} ${res.statusText}\n${text}</div>`;
+      }
+    }catch(e){
+      result.innerHTML = `<div class="err">Error de red: ${e}</div>`;
+    }
+  };
+
+  // Auto-carga contactos si hay token
+  if(jwtInput.value){ loadContacts(); }
+})();
+    </script>
+</body>
+</html>

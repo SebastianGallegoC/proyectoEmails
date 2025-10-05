@@ -1,144 +1,142 @@
-﻿using Domain.Interfaces;
-using MailKit.Net.Smtp;
-using MimeKit;
-using MimeKit.Text;
+﻿using System;
+using System.IO;
+using System.Linq;
+using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+using Domain.Interfaces;
+
+using MimeKit;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 
 namespace Infrastructure.Services
 {
     public class GmailSenderService : IEmailService
     {
-        private readonly string _fromEmail = "waldovelcon@gmail.com";
-        private readonly string _appPassword = "slkunloeyxtipiqw";
-        private readonly IEmailRepository _emailRepository;
+        private readonly ILogger<GmailSenderService> _logger;
+        private readonly IConfiguration _cfg;
 
-        public GmailSenderService(IEmailRepository emailRepository)
+        public GmailSenderService(ILogger<GmailSenderService> logger, IConfiguration cfg)
         {
-            _emailRepository = emailRepository;
+            _logger = logger;
+            _cfg = cfg;
         }
 
-        public async Task SendEmailAsync(string to, string subject, string body, List<IFormFile> attachments = null)
+        public async Task SendAsync(
+            IEnumerable<string> to,
+            string subject,
+            string? bodyHtml,
+            IEnumerable<IFormFile>? attachments,
+            CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(to) || !IsValidEmail(to))
+            // -------- Config y validaciones --------
+            var user = _cfg["Smtp:User"];
+            if (string.IsNullOrWhiteSpace(user))
+                throw new InvalidOperationException("SMTP: falta Smtp:User en configuración.");
+
+            var host = _cfg["Smtp:Host"] ?? "smtp.gmail.com";
+            var port = int.TryParse(_cfg["Smtp:Port"], out var p) ? p : 587;
+            var useStartTls = bool.TryParse(_cfg["Smtp:UseStartTls"], out var st) ? st : true;
+            var secure = useStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.SslOnConnect;
+
+            // -------- Construcción del mensaje (todo en memoria) --------
+            var msg = new MimeMessage();
+            msg.From.Add(MailboxAddress.Parse(user));
+
+            foreach (var addr in (to ?? Enumerable.Empty<string>())
+                                 .Where(a => !string.IsNullOrWhiteSpace(a))
+                                 .Distinct(StringComparer.OrdinalIgnoreCase))
+                msg.To.Add(MailboxAddress.Parse(addr));
+
+            msg.Subject = subject ?? string.Empty;
+
+            var body = new BodyBuilder { HtmlBody = bodyHtml ?? string.Empty };
+            if (attachments != null)
             {
-                throw new ArgumentException("Dirección de correo inválida: " + to);
+                foreach (var file in attachments)
+                {
+                    if (file == null || file.Length == 0) continue;
+                    await using var ms = new MemoryStream();
+                    await file.CopyToAsync(ms, ct);
+                    body.Attachments.Add(
+                        string.IsNullOrWhiteSpace(file.FileName) ? "adjunto.bin" : Path.GetFileName(file.FileName),
+                        ms.ToArray()
+                    );
+                }
             }
+            msg.Body = body.ToMessageBody();
 
-            string htmlTemplate = @"
-<!DOCTYPE html>
-<html lang=""es"">
-<head>
-    <meta charset=""UTF-8"" />
-    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
-    <title>{{subject}}</title>
-    <style type=""text/css"">
-        body { margin: 0; padding: 0; background-color: #f5f7fa; font-family: 'Google Sans', 'Roboto', Arial, sans-serif; color: #333; -webkit-font-smoothing: antialiased; width: 100% !important; }
-        p { margin: 0; padding: 0; }
-        a { text-decoration: none; }
-        img { display: block; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-        table { border-collapse: collapse !important; }
-        @media only screen and (max-width: 600px) {
-            .container { width: 100% !important; max-width: 100% !important; }
-            .content-padding { padding: 20px !important; }
-        }
-    </style>
-</head>
-<body>
-    <table border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
-        <tr>
-            <td align=""center"">
-                <table border=""0"" cellpadding=""0"" cellspacing=""0"" width=""600"" class=""container"" style=""background-color: #ffffff; border-radius: 8px;"">
-                    <tr>
-                        <td align=""center"" style=""background-color: #e80414;"">
-                            <img src=""https://i.ytimg.com/vi/Rmmf0QP0X8g/maxresdefault.jpg"" alt=""Encabezado del Correo"" width=""600"" style=""max-width: 100%; border-radius: 8px 8px 0 0;"" />
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class=""content-padding"" style=""padding: 30px;"">
-                            <p style=""font-size: 16px;"">Hola:</p>
-                            <p style=""font-size: 15px;"">{{body}}</p>
-                            <p style=""font-size: 15px;"">Un afectuoso saludo,</p>
-                            <p style=""font-size: 15px;"">[Tu Nombre]</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td align=""center"" style=""background-color: #212121; padding: 30px; color: #bdbdbd; font-size: 12px;"">
-                            <p>Este mensaje fue generado automáticamente. Por favor, no responder.</p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>";
+            using var client = new SmtpClient { Timeout = 120_000 };
 
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync("smtp.gmail.com", 587, MailKit.Security.SecureSocketOptions.StartTls);
-            await smtp.AuthenticateAsync(_fromEmail, _appPassword);
-
-            for (int i = 0; i < 2; i++) // Reintentar hasta 2 veces
+            try
+            {
+                await client.ConnectAsync(host, port, secure, ct);
+                await client.AuthenticateAsync(user, _cfg["Smtp:Password"], ct);
+                await client.SendAsync(msg, ct);
+            }
+            // ===== Errores más comunes con mensajes útiles =====
+            catch (SslHandshakeException ex)
+            {
+                _logger.LogError(ex, "TLS handshake falló con {Host}:{Port} (UseStartTls={UseStartTls})", host, port, useStartTls);
+                throw new InvalidOperationException($"SMTP/TLS: fallo de handshake con {host}:{port}. Suele ser inspección SSL o versión TLS no soportada. Detalle: {ex.Message}", ex);
+            }
+            catch (MailKit.Security.AuthenticationException ex)
+            {
+                _logger.LogError(ex, "Autenticación SMTP inválida para {User}", user);
+                throw new InvalidOperationException("SMTP: credenciales inválidas (usa App Password si es Gmail).", ex);
+            }
+            catch (SmtpCommandException ex)
+            {
+                _logger.LogError(ex, "SMTP command error {Status} en {Host}:{Port}", ex.StatusCode, host, port);
+                throw new InvalidOperationException($"SMTP: comando falló ({ex.StatusCode}). Detalle: {ex.Message}", ex);
+            }
+            catch (SmtpProtocolException ex)
+            {
+                _logger.LogError(ex, "SMTP protocolo inválido en {Host}:{Port}", host, port);
+                throw new InvalidOperationException($"SMTP: error de protocolo. Detalle: {ex.Message}", ex);
+            }
+            catch (SocketException ex)
+            {
+                _logger.LogError(ex, "No se pudo conectar a {Host}:{Port}", host, port);
+                throw new InvalidOperationException($"SMTP: no se pudo conectar a {host}:{port} ({ex.SocketErrorCode}). ¿Firewall/puerto/bloqueo de red?", ex);
+            }
+            catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+            {
+                _logger.LogError(ex, "Timeout al enviar SMTP {Host}:{Port}", host, port);
+                throw new InvalidOperationException("SMTP: timeout de conexión/envío. Revisa red/puertos.", ex);
+            }
+            catch (IOException ex)
+            {
+                _logger.LogError(ex, "I/O durante envío SMTP");
+                throw new InvalidOperationException($"SMTP: error de E/S durante el envío. Detalle: {ex.Message}", ex);
+            }
+            catch (ObjectDisposedException ex)
+            {
+                _logger.LogError(ex, "Conexión/stream dispuesto inesperadamente");
+                throw new InvalidOperationException("SMTP: la conexión se cerró inesperadamente (inspección SSL / proxy / antivirus).", ex);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error inesperado enviando correo");
+                throw new InvalidOperationException($"SMTP inesperado: {ex.Message}", ex);
+            }
+            finally
             {
                 try
                 {
-                    string htmlBody = htmlTemplate
-                        .Replace("{{to}}", to)
-                        .Replace("{{subject}}", subject)
-                        .Replace("{{body}}", body);
-
-                    var message = new MimeMessage();
-                    message.From.Add(MailboxAddress.Parse(_fromEmail));
-                    message.To.Add(MailboxAddress.Parse(to)); // Parsear solo un destinatario válido
-                    message.Subject = subject;
-                    message.Body = new TextPart(TextFormat.Html) { Text = htmlBody };
-
-                    if (attachments != null && attachments.Any())
-                    {
-                        var multipart = new Multipart("mixed");
-                        multipart.Add(message.Body);
-
-                        foreach (var file in attachments)
-                        {
-                            var memoryStream = new MemoryStream();
-                            await file.CopyToAsync(memoryStream);
-                            memoryStream.Position = 0; // Reiniciar la posición del stream
-                            var attachment = new MimePart(file.ContentType)
-                            {
-                                Content = new MimeContent(memoryStream),
-                                ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
-                                ContentTransferEncoding = ContentEncoding.Base64,
-                                FileName = file.FileName
-                            };
-                            multipart.Add(attachment);
-                        }
-
-                        message.Body = multipart;
-                    }
-
-                    await smtp.SendAsync(message);
-                    await _emailRepository.SaveEmailAsync(to, subject, body);
-                    break; // Salir del bucle si se envía correctamente
+                    if (client.IsConnected) await client.DisconnectAsync(true, ct);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ Error al enviar a {to} (intento {i + 1}): {ex.Message}");
-                    if (i == 1) throw; // Lanzar excepción después del segundo intento fallido
+                    _logger.LogWarning(ex, "Fallo al desconectar SMTP");
                 }
-            }
-
-            await smtp.DisconnectAsync(true);
-        }
-
-        private bool IsValidEmail(string email)
-        {
-            try
-            {
-                MailboxAddress.Parse(email);
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
     }

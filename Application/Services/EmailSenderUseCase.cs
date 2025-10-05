@@ -1,36 +1,28 @@
 ﻿using Domain.Interfaces;
 using Microsoft.AspNetCore.Http;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Application.Services
 {
     public class EmailSenderUseCase
     {
-        private readonly IEmailService _emailService;
-        private readonly IEmailRepository _emailRepository;
+        private readonly IEmailService _sender;
 
-        public EmailSenderUseCase(IEmailService emailService, IEmailRepository emailRepository)
+        public EmailSenderUseCase(IEmailService sender)
         {
-            _emailService = emailService;
-            _emailRepository = emailRepository;
+            _sender = sender;
         }
 
-        public async Task ExecuteAsync(string to, string subject, string body, List<IFormFile> attachments = null)
+        public Task ExecuteAsync(
+            IEnumerable<string> to,
+            string subject,
+            string? body,
+            IEnumerable<IFormFile>? attachments,
+            CancellationToken ct = default)
         {
-            var recipients = to.Split(',')
-                              .Select(r => r.Trim())
-                              .Where(r => !string.IsNullOrWhiteSpace(r))
-                              .ToList();
-
-            if (!recipients.Any())
-            {
-                throw new ArgumentException("Debe proporcionar al menos un destinatario válido.");
-            }
-
-            foreach (var recipient in recipients)
-            {
-                await _emailService.SendEmailAsync(recipient, subject, body, attachments);
-                await _emailRepository.SaveEmailAsync(recipient, subject, body);
-            }
+            return _sender.SendAsync(to, subject, body, attachments, ct);
         }
     }
 }
