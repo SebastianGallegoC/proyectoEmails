@@ -15,35 +15,41 @@ namespace Application.Services
 
         public async Task<ContactResponse> CreateAsync(CreateContactRequest req, CancellationToken ct = default)
         {
-            if (await _repo.EmailExistsAsync(req.Email, null, ct))
-                throw new InvalidOperationException("Ya existe un contacto con ese correo.");
-
             var entity = new Contact
             {
+                Id = Guid.NewGuid(),
                 Name = req.Name.Trim(),
                 Email = req.Email.Trim(),
                 Phone = req.Phone?.Trim(),
                 Notes = req.Notes?.Trim(),
                 IsFavorite = req.IsFavorite,
-                IsBlocked = req.IsBlocked
+                IsBlocked = req.IsBlocked,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
-            var saved = await _repo.AddAsync(entity, ct);
-            return Map(saved);
+            if (await _repo.EmailExistsAsync(entity.Email, null, ct))
+                throw new InvalidOperationException("Ya existe un contacto con ese email.");
+
+            var created = await _repo.AddAsync(entity, ct);
+            return Map(created);
         }
 
         public async Task<ContactResponse?> GetAsync(Guid id, CancellationToken ct = default)
         {
-            var c = await _repo.GetByIdAsync(id, ct);
-            return c is null ? null : Map(c);
+            var item = await _repo.GetByIdAsync(id, ct);
+            return item is null ? null : Map(item);
         }
+
+        public Task<PagedResult<ContactResponse>> GetAllAsync(CancellationToken ct = default)
+            => SearchAsync(null, 1, 1000, ct);
 
         public async Task<PagedResult<ContactResponse>> SearchAsync(string? q, int page, int pageSize, CancellationToken ct = default)
         {
             var (items, total) = await _repo.SearchAsync(q, page, pageSize, ct);
             return new PagedResult<ContactResponse>
             {
-                Items = items.Select(Map).ToArray(),
+                Items = items.Select(Map).ToList(),
                 Total = total,
                 Page = page,
                 PageSize = pageSize
@@ -52,24 +58,30 @@ namespace Application.Services
 
         public async Task<ContactResponse> UpdateAsync(Guid id, UpdateContactRequest req, CancellationToken ct = default)
         {
-            var entity = await _repo.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("Contacto no encontrado.");
+            var item = await _repo.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("Contacto no encontrado.");
 
-            if (await _repo.EmailExistsAsync(req.Email, id, ct))
-                throw new InvalidOperationException("Ya existe otro contacto con ese correo.");
+            var incomingEmail = req.Email?.Trim();
+            if (!string.IsNullOrWhiteSpace(incomingEmail) &&
+                !incomingEmail.Equals(item.Email, StringComparison.OrdinalIgnoreCase) &&
+                await _repo.EmailExistsAsync(incomingEmail, id, ct))
+            {
+                throw new InvalidOperationException("Ya existe un contacto con ese email.");
+            }
 
-            entity.Name = req.Name.Trim();
-            entity.Email = req.Email.Trim();
-            entity.Phone = req.Phone?.Trim();
-            entity.Notes = req.Notes?.Trim();
-            entity.IsFavorite = req.IsFavorite;
-            entity.IsBlocked = req.IsBlocked;
-            entity.UpdatedAt = DateTime.UtcNow;
+            item.Name = req.Name?.Trim() ?? item.Name;
+            item.Email = incomingEmail ?? item.Email;
+            item.Phone = req.Phone?.Trim();
+            item.Notes = req.Notes?.Trim();
+            item.IsFavorite = req.IsFavorite;
+            item.IsBlocked = req.IsBlocked;
+            item.UpdatedAt = DateTime.UtcNow;
 
-            await _repo.UpdateAsync(entity, ct);
-            return Map(entity);
+            await _repo.UpdateAsync(item, ct);
+            return Map(item);
         }
 
-        public Task DeleteAsync(Guid id, CancellationToken ct = default) => _repo.DeleteAsync(id, ct);
+        public Task DeleteAsync(Guid id, CancellationToken ct = default)
+            => _repo.DeleteAsync(id, ct);
 
         private static ContactResponse Map(Contact c) => new()
         {

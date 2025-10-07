@@ -16,79 +16,102 @@ namespace EmailsP.Controllers
         private readonly EmailSenderUseCase _useCase;
         private readonly IContactRepository _contacts;
         private readonly ILogger<EmailController> _logger;
-        private readonly IWebHostEnvironment _env;
 
         public EmailController(
             EmailSenderUseCase useCase,
             IContactRepository contacts,
-            ILogger<EmailController> logger,
-            IWebHostEnvironment env)
+            ILogger<EmailController> logger)
         {
             _useCase = useCase;
             _contacts = contacts;
             _logger = logger;
-            _env = env;
         }
 
+       
         [HttpPost("Send")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [Consumes("multipart/form-data")]
-        [RequestSizeLimit(100 * 1024 * 1024)]
-        [RequestFormLimits(MultipartBodyLengthLimit = 100 * 1024 * 1024)]
-        public async Task<IActionResult> SendEmail([FromForm] EmailRequest request)
+        [Consumes("multipart/form-data")] 
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> Send([FromForm] EmailRequest req, CancellationToken ct)
         {
-            // 1) Resolver destinatarios (To + nombres + ids)
-            var recipients = new List<string>();
+            if (req is null)
+                return BadRequest(new ProblemDetails { Title = "Solicitud inválida", Detail = "El cuerpo de la solicitud es nulo." });
 
-            if (request.To != null && request.To.Count > 0)
-                recipients.AddRange(request.To.Where(x => !string.IsNullOrWhiteSpace(x)));
+            
+            var to = new List<string>();
 
-            if (request.ToContactNames != null && request.ToContactNames.Count > 0)
+            if (req.To is not null && req.To.Count > 0)
             {
-                var emailsByNames = await _contacts.GetEmailsByNamesAsync(request.ToContactNames, allowPartialMatch: true);
-                recipients.AddRange(emailsByNames);
-                if (emailsByNames.Count == 0)
-                    return BadRequest($"No se hallaron correos para los nombres: {string.Join(", ", request.ToContactNames)}");
+                to.AddRange(req.To
+                    .Where(e => !string.IsNullOrWhiteSpace(e))
+                    .Select(e => e.Trim()));
             }
 
-            if (request.ToContactIds != null && request.ToContactIds.Count > 0)
+            if (req.ToContactIds is not null && req.ToContactIds.Count > 0)
             {
-                var emailsByIds = await _contacts.GetEmailsByIdsAsync(request.ToContactIds);
-                recipients.AddRange(emailsByIds);
-                if (emailsByIds.Count == 0)
-                    return BadRequest("Ningún ID de contacto resolvió un correo.");
+                var byIds = await _contacts.GetEmailsByIdsAsync(req.ToContactIds, ct);
+                to.AddRange(byIds);
             }
 
-            recipients = recipients
-                .Where(x => !string.IsNullOrWhiteSpace(x))
+            if (req.ToContactNames is not null && req.ToContactNames.Count > 0)
+            {
+                var byNames = await _contacts.GetEmailsByNamesAsync(req.ToContactNames, allowPartialMatch: true, ct);
+                to.AddRange(byNames);
+            }
+
+            to = to
+                .Where(e => !string.IsNullOrWhiteSpace(e))
+                .Select(e => e.Trim())
+                .Where(e => e.Length > 2)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            if (recipients.Count == 0)
-                return BadRequest("Debe proporcionar al menos un destinatario (To, ToContactNames o ToContactIds).");
+            if (to.Count == 0)
+            {
+                return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
+                {
+                    ["recipients"] = new[] { "Debe incluir al menos un destinatario válido (To, ToContactNames o ToContactIds)." }
+                }));
+            }
 
-            // 2) Enviar
+            if (string.IsNullOrWhiteSpace(req.Subject) && string.IsNullOrWhiteSpace(req.Body))
+            {
+                return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
+                {
+                    ["content"] = new[] { "Debe especificar Subject o Body." }
+                }));
+            }
+
             try
             {
-                await _useCase.ExecuteAsync(recipients, request.Subject, request.Body, request.Attachments);
-                return Ok("✅ Envío de correos completado.");
+                await _useCase.ExecuteAsync(
+                    to,
+                    req.Subject!.Trim(),
+                    string.IsNullOrWhiteSpace(req.Body) ? null : req.Body!.Trim(),
+                    req.Attachments,
+                    ct);
+
+                return Ok(new
+                {
+                    status = "Queued",
+                    recipients = to
+                });
             }
-            catch (InvalidOperationException ex)
+            catch (OperationCanceledException)
             {
-                _logger.LogError(ex, "Error controlado en envío.");
-                var detail = _env.IsDevelopment() ? Flatten(ex) : ex.Message;
-                // 502: Bad Gateway (fallo al hablar con servidor SMTP)
-                return Problem(statusCode: StatusCodes.Status502BadGateway,
-                               title: "Error al enviar",
-                               detail: detail);
+                return Problem(
+                    title: "Cancelado",
+                    detail: "La operación fue cancelada.",
+                    statusCode: StatusCodes.Status499ClientClosedRequest);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error inesperado al enviar.");
-                var detail = _env.IsDevelopment() ? Flatten(ex) : "Ocurrió un error al enviar el correo.";
-                return Problem(statusCode: StatusCodes.Status500InternalServerError,
-                               title: "Error inesperado",
-                               detail: detail);
+                _logger.LogError(ex, "Fallo al enviar email");
+                return Problem(
+                    title: "Error al enviar email",
+                    detail: Flatten(ex),
+                    statusCode: StatusCodes.Status500InternalServerError);
             }
         }
 

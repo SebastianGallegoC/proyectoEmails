@@ -8,7 +8,7 @@ namespace EmailsP.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
-    [Authorize] // requiere JWT
+    [Authorize] 
     public class ContactsController : ControllerBase
     {
         private readonly ContactService _svc;
@@ -18,6 +18,7 @@ namespace EmailsP.Controllers
             _svc = svc;
         }
 
+       
         [HttpPost]
         [ProducesResponseType(typeof(ContactResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -37,19 +38,21 @@ namespace EmailsP.Controllers
             return Ok(item);
         }
 
+       
         [HttpGet]
         [ProducesResponseType(typeof(PagedResult<ContactResponse>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> Search([FromQuery] string? q, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetAll()
         {
-            page = page <= 0 ? 1 : page;
-            pageSize = pageSize <= 0 || pageSize > 200 ? 20 : pageSize;
-
-            var result = await _svc.SearchAsync(q, page, pageSize);
+            const int defaultPage = 1;
+            const int defaultPageSize = 1000; 
+            var result = await _svc.SearchAsync(q: null, page: defaultPage, pageSize: defaultPageSize);
             return Ok(result);
         }
 
+     
         [HttpPut("{id:guid}")]
         [ProducesResponseType(typeof(ContactResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateContactRequest req)
         {

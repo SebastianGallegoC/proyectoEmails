@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 
 namespace Application.Services
 {
-    public class EmailSenderUseCase
+    /// Caso de uso para envío de correos. Delegado a <see cref="IEmailService"/>.
+    public sealed class EmailSenderUseCase
     {
         private readonly IEmailService _sender;
 
@@ -15,6 +16,12 @@ namespace Application.Services
             _sender = sender;
         }
 
+ 
+        /// <param name="to">Destinatarios.</param>
+        /// <param name="subject">Asunto.</param>
+        /// <param name="body">Cuerpo (HTML permitido).</param>
+        /// <param name="attachments">Adjuntos opcionales.</param>
+        /// <param name="ct">Token de cancelación.</param>
         public Task ExecuteAsync(
             IEnumerable<string> to,
             string subject,
