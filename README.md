@@ -6,7 +6,8 @@
 1. Clone the repository from GitHub:
 git clone https://github.com/usuario/proyectoEmails.git
 
-2. Open the project folder in Visual Studio with the absolute path => "C:\Users\<your-PC-USER>\source\repos\proyectoEmails"
+2. Open the project folder in Visual Studio with the absolute path 
+=> "C:\Users\<your-PC-USER>\source\repos\proyectoEmails"
 
 3. Verify that the EmailsP.sln solution file is in the root directory.
 
@@ -35,14 +36,13 @@ dotnet add package Moq --version 4.20.72
 dotnet add package coverlet.collector --version 6.0.0
 
 2. Verify this lines on the .csproj en el entorno de pruebas "EmailsP.Tests":
-- <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" /> 
-- <PackageReference Include="xunit" Version="2.9.3" />
-- <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" /> 
-- <PackageReference Include="Moq" Version="4.20.72" /> 
-- <PackageReference Include="coverlet.collector" Version="6.0.0" />
+- "PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0"
+- "PackageReference Include="xunit" Version="2.9.3" />"
+- "PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />"
+- "PackageReference Include="Moq" Version="4.20.72" />"
+- "PackageReference Include="coverlet.collector" Version="6.0.0" />"
 
-3. Comprobar que aparezca el entorno y se pueda ejecutar con Pruebas >> Ejecutar todas las pruebas, sino:
-
+3. Verify that the environment appears and can be run with Tests >> Run all tests, otherwise:
 - Right-click on the solution >>>> Add >>>> Existing Project... and Select EmailsP.Tests.csproj.
 - Open the Test Explorer:
 - Menu: Tests >>>> Windows >>>> Test Explorer
