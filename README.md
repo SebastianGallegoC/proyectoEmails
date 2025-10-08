@@ -49,3 +49,8 @@ dotnet add package coverlet.collector --version 6.0.0
 - Press Refresh.
 - Run the tests:
 - Menu: Tests >>>> Run All Tests
+![Imagen de WhatsApp 2025-10-08 a las 17 09 47_dca93554](https://github.com/user-attachments/assets/4c52fc17-fee4-4953-845d-2c8414bc3859)
+![Imagen de WhatsApp 2025-10-08 a las 14 02 58_fa3d5b72](https://github.com/user-attachments/assets/3cbad051-cf5c-44ac-ae6e-94957ef1557d)
+![Imagen de WhatsApp 2025-10-08 a las 14 02 58_67c349d8](https://github.com/user-attachments/assets/0083f8f3-bac9-4efd-a287-5a85b0ddc82d)
+
+
