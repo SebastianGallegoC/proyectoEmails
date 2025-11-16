@@ -1,0 +1,45 @@
+name: CI - Build & Push Docker
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # CI: compilar y correr tests .NET 8
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore EmailsP.sln
+
+      - name: Build
+        run: dotnet build EmailsP.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test EmailsP.Tests/EmailsP.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      # Login en Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Construir y subir la imagen
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/proyectoemails:latest
