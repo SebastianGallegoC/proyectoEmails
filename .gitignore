@@ -1,3 +1,55 @@
+# Visual Studio
 .vs
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build outputs
 /*/obj/
 /*/bin/
+**/obj/
+**/bin/
+
+# ============================================
+# ARCHIVOS CON CREDENCIALES SENSIBLES
+# ⚠️ NUNCA subir estos archivos a Git
+# ============================================
+
+# Variables de entorno (contienen passwords, tokens, etc.)
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Archivos de configuración con credenciales
+appsettings.Development.json
+appsettings.Production.json
+appsettings.*.json
+!appsettings.json
+
+# Credenciales de Google OAuth y otros servicios
+**/credentials/*.json
+**/credentials/*.p12
+!**/credentials/.gitkeep
+
+# Tokens y archivos de autenticación
+token.json
+*.token
+*.key
+*.pem
+
+# Docker
+docker-compose.override.yml
+.dockerignore.local
+
+# Logs que pueden contener información sensible
+**/logs/
+*.log
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

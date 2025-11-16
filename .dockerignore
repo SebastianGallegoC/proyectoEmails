@@ -1,0 +1,46 @@
+# Archivos y carpetas de compilación de .NET
+**/bin/
+**/obj/
+**/out/
+
+# Archivos de pruebas
+**/TestResults/
+**/*.trx
+
+# Archivos de usuario y configuración local
+**/.vs/
+**/.vscode/
+**/*.user
+**/*.suo
+**/*.userosscache
+**/*.sln.docstates
+
+# Archivos de NuGet
+**/*.nupkg
+**/*.snupkg
+**/packages/
+
+# Archivos de sistema
+**/.DS_Store
+**/Thumbs.db
+**/*.swp
+**/*.swo
+**/~$*
+
+# Git
+**/.git/
+**/.gitignore
+**/.gitattributes
+
+# Docker
+**/Dockerfile*
+**/docker-compose*
+**/.dockerignore
+
+# README y documentación (no necesarios en la imagen)
+**/README.md
+**/*.md
+
+# Archivos de logs
+**/logs/
+**/*.log

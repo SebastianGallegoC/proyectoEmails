@@ -1,0 +1,46 @@
+# ==================================================
+# CONFIGURACIÓN PARA USAR BASE DE DATOS EXTERNA
+# ==================================================
+# Este archivo es para cuando quieras conectarte a una BD externa
+# en lugar de usar PostgreSQL en Docker
+#
+# USO: docker-compose -f docker-compose.external-db.yml up
+# 
+# IMPORTANTE: Crea un archivo .env.production con tus credenciales
+# de producción y cárgalo antes de ejecutar
+# ==================================================
+
+services:
+  
+  # --------------------------------------------------
+  # APLICACIÓN .NET (solo la API, sin PostgreSQL)
+  # --------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    container_name: emailsp_api
+    restart: unless-stopped
+    
+    ports:
+      - "${API_PORT:-5000}:8080"
+    
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
+      - ASPNETCORE_URLS=${ASPNETCORE_URLS:-http://+:8080}
+      
+      # Conexión a la base de datos EXTERNA (desde .env)
+      - ConnectionStrings__DefaultConnection=${CONNECTION_STRING}
+      
+      # JWT (desde .env)
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=${JWT_ISSUER}
+      - Jwt__Audience=${JWT_AUDIENCE}
+      
+      # SMTP (desde .env)
+      - Smtp__Host=${SMTP_HOST}
+      - Smtp__Port=${SMTP_PORT}
+      - Smtp__UseStartTls=${SMTP_USE_STARTTLS}
+      - Smtp__User=${SMTP_USER}
+      - Smtp__Password=${SMTP_PASSWORD}

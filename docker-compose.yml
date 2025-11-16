@@ -1,0 +1,91 @@
+# ==================================================
+# SERVICIOS (Contenedores que se van a ejecutar)
+# ==================================================
+# Este archivo lee las variables del archivo .env
+# NO contiene credenciales directamente (más seguro)
+# ==================================================
+
+services:
+  
+  # --------------------------------------------------
+  # BASE DE DATOS PostgreSQL
+  # --------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: emailsp_postgres
+    restart: unless-stopped
+    
+    environment:
+      # Variables leídas desde .env
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    
+    networks:
+      - emailsp_network
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------
+  # APLICACIÓN .NET
+  # --------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    container_name: emailsp_api
+    restart: unless-stopped
+    
+    ports:
+      - "${API_PORT:-5000}:8080"
+    
+    environment:
+      # Configuración de ASP.NET Core
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - ASPNETCORE_URLS=${ASPNETCORE_URLS:-http://+:8080}
+      
+      # Cadena de conexión (usa variables del .env)
+      - ConnectionStrings__DefaultConnection=${CONNECTION_STRING}
+      
+      # JWT (usa variables del .env)
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=${JWT_ISSUER}
+      - Jwt__Audience=${JWT_AUDIENCE}
+      
+      # SMTP (usa variables del .env)
+      - Smtp__Host=${SMTP_HOST}
+      - Smtp__Port=${SMTP_PORT}
+      - Smtp__UseStartTls=${SMTP_USE_STARTTLS}
+      - Smtp__User=${SMTP_USER}
+      - Smtp__Password=${SMTP_PASSWORD}
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    networks:
+      - emailsp_network
+
+# ==================================================
+# VOLÚMENES (Para persistir datos)
+# ==================================================
+volumes:
+  postgres_data:
+
+# ==================================================
+# REDES (Para que los contenedores se comuniquen)
+# ==================================================
+networks:
+  emailsp_network:
+    driver: bridge

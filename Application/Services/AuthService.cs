@@ -19,7 +19,7 @@ namespace Application.Services
 
         public LoginResponse? Authenticate(LoginRequest request)
         {
-            // Validación simulada
+            // Validación simula da
             if (request.Username != "admin" || request.Password != "1234")
                 return null;
 
