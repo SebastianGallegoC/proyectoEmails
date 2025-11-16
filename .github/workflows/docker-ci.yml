@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  statuses: write
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
